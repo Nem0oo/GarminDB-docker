@@ -12,13 +12,18 @@ assert_eq() { # expected actual msg
 assert_file() { [ -f "$1" ] || fail "expected file $1"; }
 assert_no_file() { [ ! -e "$1" ] || fail "unexpected file $1"; }
 
-# make_stub_cli <dir> <exit_code> [sleep_seconds]
-# Writes <dir>/garmindb_cli.py: appends its args to <dir>/cli_args, sleeps, exits.
+# make_stub_cli <dir> <exit_code> [sleep_seconds] [stdout_message] [log_message]
+# Writes <dir>/garmindb_cli.py: appends its args to <dir>/cli_args and its working dir to
+# <dir>/cli_pwd, prints stdout_message, writes log_message to ./garmindb.log (as GarminDB
+# does), sleeps, exits.
 make_stub_cli() {
-  local dir=$1 code=$2 nap=${3:-0}
+  local dir=$1 code=$2 nap=${3:-0} msg=${4:-} logmsg=${5:-}
   cat >"$dir/garmindb_cli.py" <<EOF
 #!/usr/bin/env bash
 echo "\$*" >>"$dir/cli_args"
+pwd >"$dir/cli_pwd"
+[ -n "$msg" ] && echo "$msg"
+[ -n "$logmsg" ] && echo "$logmsg" >garmindb.log
 sleep $nap
 exit $code
 EOF

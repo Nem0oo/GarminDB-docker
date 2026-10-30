@@ -16,15 +16,28 @@ if ! flock -n 9; then
 fi
 
 log "sync started"
-code=0
-"$GARMINDB_CLI" --all --download --import --analyze --latest || code=$?
+mkdir -p "$HEALTHDATA_DIR"
+# GarminDB writes garmindb.log in the working directory: keep it on the data volume.
+cd "$HEALTHDATA_DIR"
+output=$(mktemp)
+trap 'rm -f "$output"' EXIT
+
+set +e
+"$GARMINDB_CLI" --all --download --import --analyze --latest 2>&1 | tee "$output"
+code=${PIPESTATUS[0]}
+set -e
+
+# GarminDB exits 0 on these errors (bare sys.exit()), so detect them from its output.
+if [ "$code" -eq 0 ] && grep -qE 'Failed to login!|Missing config:' "$output"; then
+  code=1
+fi
 
 if [ "$code" -ne 0 ]; then
-  log "sync failed (exit $code)"
+  log "sync failed (exit $code), end of garmindb.log:"
+  tail -n 50 garmindb.log 2>/dev/null || true
   exit "$code"
 fi
 
-mkdir -p "$HEALTHDATA_DIR"
 date -Iseconds >"$HEALTHDATA_DIR/last_success.tmp"
 mv "$HEALTHDATA_DIR/last_success.tmp" "$HEALTHDATA_DIR/last_success"
 log "sync succeeded"
