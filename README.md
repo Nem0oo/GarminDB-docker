@@ -42,38 +42,47 @@ docker compose exec garmindb healthcheck.sh    # état de la dernière synchro
 docker logs -f garmindb                        # logs des synchros
 ```
 
-## Mise en place sur le serveur (reprise des données de garmin-bridge)
+## Mise en place
 
-1. Copier les données existantes, sans toucher aux originaux (adapter les chemins à ceux du
-   compose actuel) :
+### Première installation
+
+1. Créer `GarminConnectConfig.json` dans le volume de config à partir de
+   [l'exemple de GarminDB](https://github.com/tcgoetz/GarminDB/blob/master/garmindb/GarminConnectConfig.json.example)
+   (identifiants, dates de début, statistiques à télécharger).
+2. `docker compose up -d garmindb`.
+3. Faire la première connexion en mode interactif (Garmin peut demander un code MFA) et
+   télécharger tout l'historique :
    ```bash
-   mkdir -p garmindb-docker
-   cp -a garmindb_conf garmindb-docker/conf
-   cp -a garmindb_data garmindb-docker/data
+   docker compose exec -it garmindb garmindb_cli.py --all --download --import --analyze
    ```
-2. Ajouter le service au compose, puis `docker compose up -d garmindb`.
-3. Reconstruire les bases une fois :
+
+### Reprise de données GarminDB existantes
+
+1. Copier le dossier `~/.GarminDb` existant dans le volume de config et le dossier `HealthData`
+   dans le volume de données (voir le tableau des volumes).
+2. `docker compose up -d garmindb`.
+3. Si les bases ont été créées par une autre version de GarminDB, la synchro échoue avec
+   « version mismatch. Please rebuild ». Reconstruire les bases une fois :
    ```bash
    docker compose exec garmindb garmindb_cli.py --rebuild_db
    ```
-   garmin-bridge utilisait un fork de GarminDB qui change la version de certaines tables
-   d'activités. Le GarminDB d'origine refuse ces bases (« version mismatch. Please rebuild »).
-   `--rebuild_db` supprime les bases SQLite et les recrée à partir des fichiers FIT/JSON déjà
-   téléchargés : rien n'est retéléchargé et aucune donnée n'est perdue. Seules les colonnes
-   ajoutées par le fork disparaissent. Ça peut prendre un moment selon l'historique.
-4. `docker compose exec garmindb sync-now`, puis vérifier les logs, la date des bases dans
-   `data/DBs/` et la présence de `last_success`.
-5. Le lendemain, vérifier qu'une synchro a eu lieu vers 04:00 et que le conteneur est `healthy`.
+   Les bases SQLite sont supprimées puis recréées à partir des fichiers FIT/JSON déjà téléchargés :
+   rien n'est retéléchargé. Ça peut prendre un moment selon l'historique.
 
-Les anciens dossiers `garmindb_conf/` et `garmindb_data/` restent en place : les outils d'écriture
-de garmin-bridge utilisent encore les jetons de `garmindb_conf/`.
+### Vérification
+
+1. `docker compose exec garmindb sync-now`, puis vérifier la date des bases dans `data/DBs/` et
+   la présence de `data/last_success`.
+2. Le lendemain, vérifier qu'une synchro a eu lieu à l'heure prévue et que le conteneur est
+   `healthy`.
+
+Ce qui est lancé avec `docker compose exec` s'affiche dans le terminal, pas dans `docker logs`.
+Le détail de la dernière exécution reste dans `data/garmindb.log`.
 
 ### Jetons Garmin
 
-Le service et garmin-bridge partent de la même copie des jetons Garmin, puis chacun les renouvelle
-de son côté. Si l'un d'eux voit sa connexion refusée (conteneur `unhealthy`, « Failed to login! »
-dans les logs), il faut refaire la connexion en mode interactif, car Garmin peut demander un code
-MFA :
+Si la connexion est refusée (conteneur `unhealthy`, « Failed to login! » dans les logs), il faut
+refaire la connexion en mode interactif, car Garmin peut demander un code MFA :
 
 ```bash
 docker compose exec -it garmindb garmindb_cli.py --all --download --latest
@@ -84,7 +93,7 @@ docker compose exec -it garmindb garmindb_cli.py --all --download --latest
 - Push sur `main` : tests des scripts, build, push de `garmindb-docker:latest` sur Docker Hub
   (l'ancienne image est retaguée `previous`), puis redéploiement via le webhook n8n.
 - Pull request : tests des scripts et build de l'image, sans push.
-- Dependabot ouvre chaque semaine une PR si GarminDB a publié une nouvelle version.
+- Dependabot vérifie chaque semaine la branche `master` de GarminDB et ouvre une PR si elle a avancé.
 
 Secrets du repo : `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `N8N_WEBHOOK_ID`.
 
