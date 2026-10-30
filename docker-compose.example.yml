@@ -1,0 +1,11 @@
+services:
+  garmindb:
+    image: <dockerhub-user>/garmindb-docker:latest
+    container_name: garmindb
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Paris
+      - SYNC_SCHEDULE=0 4 * * *
+    volumes:
+      - ./garmindb-docker/conf:/root/.GarminDb:rw
+      - ./garmindb-docker/data:/root/HealthData:rw
