@@ -52,12 +52,32 @@ docker logs -f garmindb                        # logs des synchros
    cp -a garmindb_data garmindb-docker/data
    ```
 2. Ajouter le service au compose, puis `docker compose up -d garmindb`.
-3. `docker compose exec garmindb sync-now`, puis vérifier les logs, la date des bases dans
+3. Reconstruire les bases une fois :
+   ```bash
+   docker compose exec garmindb garmindb_cli.py --rebuild_db
+   ```
+   garmin-bridge utilisait un fork de GarminDB qui change la version de certaines tables
+   d'activités. Le GarminDB d'origine refuse ces bases (« version mismatch. Please rebuild »).
+   `--rebuild_db` supprime les bases SQLite et les recrée à partir des fichiers FIT/JSON déjà
+   téléchargés : rien n'est retéléchargé et aucune donnée n'est perdue. Seules les colonnes
+   ajoutées par le fork disparaissent. Ça peut prendre un moment selon l'historique.
+4. `docker compose exec garmindb sync-now`, puis vérifier les logs, la date des bases dans
    `data/DBs/` et la présence de `last_success`.
-4. Le lendemain, vérifier qu'une synchro a eu lieu vers 04:00 et que le conteneur est `healthy`.
+5. Le lendemain, vérifier qu'une synchro a eu lieu vers 04:00 et que le conteneur est `healthy`.
 
 Les anciens dossiers `garmindb_conf/` et `garmindb_data/` restent en place : les outils d'écriture
 de garmin-bridge utilisent encore les jetons de `garmindb_conf/`.
+
+### Jetons Garmin
+
+Le service et garmin-bridge partent de la même copie des jetons Garmin, puis chacun les renouvelle
+de son côté. Si l'un d'eux voit sa connexion refusée (conteneur `unhealthy`, « Failed to login! »
+dans les logs), il faut refaire la connexion en mode interactif, car Garmin peut demander un code
+MFA :
+
+```bash
+docker compose exec -it garmindb garmindb_cli.py --all --download --latest
+```
 
 ## CI/CD
 

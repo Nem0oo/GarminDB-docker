@@ -145,9 +145,11 @@ Les données sont sur le serveur, à côté du compose de `garmin-bridge`.
    ```
    (adapter les chemins à ceux du compose actuel)
 2. Ajouter le service au compose, puis `docker compose up -d garmindb`.
-3. `docker compose exec garmindb sync-now`, puis vérifier les logs, la date des bases dans
+3. `docker compose exec garmindb garmindb_cli.py --rebuild_db` : les bases viennent d'un fork de
+   GarminDB dont les versions de tables diffèrent ; reconstruction depuis les fichiers FIT/JSON.
+4. `docker compose exec garmindb sync-now`, puis vérifier les logs, la date des bases dans
    `data/DBs/` et la présence de `last_success`.
-4. Le lendemain, vérifier qu'une synchro a eu lieu vers 04:00 et que le conteneur est `healthy`.
+5. Le lendemain, vérifier qu'une synchro a eu lieu vers 04:00 et que le conteneur est `healthy`.
 
 Les anciens dossiers `garmindb_conf/` et `garmindb_data/` restent en place.
 
